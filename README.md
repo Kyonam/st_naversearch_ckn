@@ -13,7 +13,14 @@
 2. `pip install -r requirements.txt` 명령어로 필요한 라이브러리 설치
 3. `streamlit run app.py` 실행
 
-## 기술 스택
+## Streamlit Cloud 배포 설정
+Streamlit Cloud에 배포할 때는 보안을 위해 `.env.local` 파일을 업로드하지 않습니다. 대신 아래 설정을 완료해 주세요:
+1. Streamlit Cloud의 대시보드에서 해당 앱의 **Settings > Secrets** 탭으로 이동합니다.
+2. 아래 형식으로 API 키를 입력하고 저장합니다:
+   ```toml
+   CLIENT_ID = "YOUR_NAVER_CLIENT_ID"
+   CLIENT_SECRET = "YOUR_NAVER_CLIENT_SECRET"
+   ```
 - Python 3.x
 - Streamlit
 - Plotly

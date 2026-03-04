@@ -14,21 +14,26 @@ st.set_page_config(page_title="네이버 통합 트렌드 분석 대시보드", 
 def load_credentials():
     env_path = ".env.local"
     creds = {"client_id": None, "client_secret": None}
+    
+    # Try loading from .env.local if it exists
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
             for line in f:
                 if "=" in line:
-                    k, v = line.strip().split("=", 1)
-                    if k.upper() in ["CLIENT_ID", "CLIENT_SECRET"]:
-                        creds[k.lower()] = v
-                    elif k.lower() in ["client_id", "client_secret"]:
-                        creds[k.lower()] = v
-    # Fallback to current workspace env check (some OS might use ClIENT_ID typo)
+                    parts = line.strip().split("=", 1)
+                    if len(parts) == 2:
+                        k, v = parts
+                        if k.upper() in ["CLIENT_ID", "CLIENT_SECRET", "CLIENT_ID", "CLIENT_SECRET"]:
+                            creds[k.lower().replace("client_id", "client_id").replace("client_secret", "client_secret")] = v
+    
+    # Try loading from streamlit secrets (for cloud deployment)
     if not creds["client_id"] or not creds["client_secret"]:
-         with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                if "ClIENT_ID" in line: creds["client_id"] = line.split("=")[1].strip()
-                if "ClIENT_SECRET" in line: creds["client_secret"] = line.split("=")[1].strip()
+        try:
+            creds["client_id"] = st.secrets.get("CLIENT_ID") or st.secrets.get("client_id")
+            creds["client_secret"] = st.secrets.get("CLIENT_SECRET") or st.secrets.get("client_secret")
+        except:
+            pass
+            
     return creds
 
 creds = load_credentials()
