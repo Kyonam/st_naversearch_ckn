@@ -13,36 +13,41 @@ st.set_page_config(page_title="네이버 통합 트렌드 분석 대시보드", 
 # 2. Credential Loading
 def load_credentials():
     env_path = ".env.local"
-    creds = {"client_id": None, "client_secret": None, "source": "None"}
+    creds = {"client_id": None, "client_secret": None, "source": "None", "keys_found": []}
     
-    # Try loading from .env.local if it exists
-    if os.path.exists(env_path):
+    # 1. Try loading from Streamlit Secrets (Priority for Cloud)
+    try:
+        if hasattr(st, "secrets"):
+            creds["keys_found"] = list(st.secrets.keys())
+            # Try various naming conventions
+            for k in ["CLIENT_ID", "client_id", "ClIENT_ID", "NAVER_CLIENT_ID"]:
+                if k in st.secrets:
+                    creds["client_id"] = st.secrets[k]
+                    break
+            for k in ["CLIENT_SECRET", "client_secret", "ClIENT_SECRET", "NAVER_CLIENT_SECRET"]:
+                if k in st.secrets:
+                    creds["client_secret"] = st.secrets[k]
+                    break
+            
+            if creds["client_id"] and creds["client_secret"]:
+                creds["source"] = "Streamlit Secrets"
+    except Exception as e:
+        pass
+
+    # 2. Try loading from .env.local if not found in Secrets
+    if (not creds["client_id"] or not creds["client_secret"]) and os.path.exists(env_path):
         try:
             with open(env_path, "r", encoding="utf-8") as f:
                 for line in f:
                     if "=" in line:
-                        parts = line.strip().split("=", 1)
-                        if len(parts) == 2:
-                            k, v = parts
-                            k_clean = k.strip().upper()
-                            if k_clean in ["CLIENT_ID", "CLIENT_SECRET", "CLIENT_ID", "CLIENT_SECRET"]:
-                                key_map = {"CLIENT_ID": "client_id", "CLIENT_SECRET": "client_secret"}
-                                # Fix potential mapping for common typos
-                                if "CLIENT_ID" in k_clean: creds["client_id"] = v.strip()
-                                if "CLIENT_SECRET" in k_clean: creds["client_secret"] = v.strip()
-                                creds["source"] = ".env.local"
-        except Exception as e:
-            st.sidebar.error(f".env.local 로드 실패: {e}")
-    
-    # Try loading from streamlit secrets (for cloud deployment)
-    if not creds["client_id"] or not creds["client_secret"]:
-        try:
-            client_id = st.secrets.get("CLIENT_ID") or st.secrets.get("client_id")
-            client_secret = st.secrets.get("CLIENT_SECRET") or st.secrets.get("client_secret")
-            if client_id and client_secret:
-                creds["client_id"] = client_id.strip()
-                creds["client_secret"] = client_secret.strip()
-                creds["source"] = "Streamlit Secrets"
+                        k, v = line.strip().split("=", 1)
+                        k_up = k.strip().upper()
+                        if "CLIENT_ID" in k_up or "CLIENT_ID" in k_up: # handles typos
+                            creds["client_id"] = v.strip()
+                        if "CLIENT_SECRET" in k_up:
+                            creds["client_secret"] = v.strip()
+            if creds["client_id"] and creds["client_secret"]:
+                creds["source"] = ".env.local"
         except:
             pass
             
@@ -51,14 +56,31 @@ def load_credentials():
 creds = load_credentials()
 
 # 3. Sidebar Configuration
-st.sidebar.title("🔍 검색 설정")
+st.sidebar.title("🔍 검색 및 인증 설정")
+
+# Manual Override (Failsafe)
+with st.sidebar.expander("🔑 인증 정보 수동 입력 (비상용)"):
+    st.info("Secrets가 작동하지 않을 경우 직접 입력하세요.")
+    manual_id = st.text_input("NAVER_CLIENT_ID", value=creds["client_id"] if creds["client_id"] else "")
+    manual_secret = st.text_input("NAVER_CLIENT_SECRET", type="password", value=creds["client_secret"] if creds["client_secret"] else "")
+    if manual_id and manual_secret:
+        creds["client_id"] = manual_id
+        creds["client_secret"] = manual_secret
+        creds["source"] = "Manual Input"
+
 if creds["client_id"] and creds["client_secret"]:
-    masked_id = creds["client_id"][:4] + "****"
-    st.sidebar.success(f"✅ 인증 정보 로드 (Source: {creds['source']})")
-    st.sidebar.info(f"ID prefix: {masked_id}")
+    masked_id = str(creds["client_id"])[:4] + "****"
+    st.sidebar.success(f"✅ 인증 정보 로드 (출처: {creds['source']})")
+    st.sidebar.info(f"ID 확인: {masked_id}")
 else:
-    st.sidebar.error("❌ API 인증 정보가 없습니다.")
-    st.sidebar.info("Streamlit Cloud 설정의 Secrets 탭에 CLIENT_ID와 CLIENT_SECRET을 입력해 주세요.")
+    st.sidebar.error("❌ 인증 정보 로딩 실패")
+    st.sidebar.warning("Streamlit Cloud의 App Settings > Secrets에 정보를 입력해 주세요.")
+
+# Debug Info
+with st.sidebar.expander("🛠️ 시스템 디버그 정보"):
+    st.write("발견된 Secrets 키:", creds["keys_found"])
+    st.write("현재 소스:", creds["source"])
+    st.write("환경 파일 존재:", os.path.exists(".env.local"))
 
 keywords_input = st.sidebar.text_input("비교 키워드 (쉼표 구분)", "선풍기, 핫팩")
 target_keywords = [k.strip() for k in keywords_input.split(",") if k.strip()]
