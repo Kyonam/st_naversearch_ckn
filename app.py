@@ -80,13 +80,17 @@ def get_shopping_insight(keywords, start_date, end_date):
         res = requests.post(url, headers=headers, json=body)
         if res.status_code == 200:
             data = res.json()
-            for row in data['results'][0]['data']:
-                results.append({
-                    "date": row['period'],
-                    "keyword": kw,
-                    "ratio": row['ratio']
-                })
-    return pd.DataFrame(results)
+            if 'results' in data and data['results'] and 'data' in data['results'][0]:
+                for row in data['results'][0]['data']:
+                    results.append({
+                        "date": row['period'],
+                        "keyword": kw,
+                        "ratio": row['ratio']
+                    })
+        else:
+            st.error(f"API 호출 실패 ({kw}): {res.status_code} - {res.text}")
+            
+    return pd.DataFrame(results) if results else pd.DataFrame(columns=["date", "keyword", "ratio"])
 
 def search_naver(query, category="blog", start=1, display=10):
     url_map = {
@@ -114,7 +118,11 @@ tab1, tab2, tab3 = st.tabs(["📉 트렌드 분석", "📑 심층 EDA 리포트"
 if target_keywords:
     with st.spinner('데이터 수집 중...'):
         df = get_shopping_insight(target_keywords, start_date, end_date)
-        df['date'] = pd.to_datetime(df['date'])
+        if not df.empty and 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'])
+        else:
+            # Create an empty dataframe with columns if it failed
+            df = pd.DataFrame(columns=['date', 'keyword', 'ratio'])
 
     # --- TAB 1: Trend Analysis ---
     with tab1:
