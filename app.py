@@ -13,24 +13,36 @@ st.set_page_config(page_title="네이버 통합 트렌드 분석 대시보드", 
 # 2. Credential Loading
 def load_credentials():
     env_path = ".env.local"
-    creds = {"client_id": None, "client_secret": None}
+    creds = {"client_id": None, "client_secret": None, "source": "None"}
     
     # Try loading from .env.local if it exists
     if os.path.exists(env_path):
-        with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                if "=" in line:
-                    parts = line.strip().split("=", 1)
-                    if len(parts) == 2:
-                        k, v = parts
-                        if k.upper() in ["CLIENT_ID", "CLIENT_SECRET", "CLIENT_ID", "CLIENT_SECRET"]:
-                            creds[k.lower().replace("client_id", "client_id").replace("client_secret", "client_secret")] = v
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if "=" in line:
+                        parts = line.strip().split("=", 1)
+                        if len(parts) == 2:
+                            k, v = parts
+                            k_clean = k.strip().upper()
+                            if k_clean in ["CLIENT_ID", "CLIENT_SECRET", "CLIENT_ID", "CLIENT_SECRET"]:
+                                key_map = {"CLIENT_ID": "client_id", "CLIENT_SECRET": "client_secret"}
+                                # Fix potential mapping for common typos
+                                if "CLIENT_ID" in k_clean: creds["client_id"] = v.strip()
+                                if "CLIENT_SECRET" in k_clean: creds["client_secret"] = v.strip()
+                                creds["source"] = ".env.local"
+        except Exception as e:
+            st.sidebar.error(f".env.local 로드 실패: {e}")
     
     # Try loading from streamlit secrets (for cloud deployment)
     if not creds["client_id"] or not creds["client_secret"]:
         try:
-            creds["client_id"] = st.secrets.get("CLIENT_ID") or st.secrets.get("client_id")
-            creds["client_secret"] = st.secrets.get("CLIENT_SECRET") or st.secrets.get("client_secret")
+            client_id = st.secrets.get("CLIENT_ID") or st.secrets.get("client_id")
+            client_secret = st.secrets.get("CLIENT_SECRET") or st.secrets.get("client_secret")
+            if client_id and client_secret:
+                creds["client_id"] = client_id.strip()
+                creds["client_secret"] = client_secret.strip()
+                creds["source"] = "Streamlit Secrets"
         except:
             pass
             
@@ -40,10 +52,13 @@ creds = load_credentials()
 
 # 3. Sidebar Configuration
 st.sidebar.title("🔍 검색 설정")
-if not creds["client_id"] or not creds["client_secret"]:
-    st.sidebar.error("API 인증 정보가 없습니다 (.env.local 확인)")
+if creds["client_id"] and creds["client_secret"]:
+    masked_id = creds["client_id"][:4] + "****"
+    st.sidebar.success(f"✅ 인증 정보 로드 (Source: {creds['source']})")
+    st.sidebar.info(f"ID prefix: {masked_id}")
 else:
-    st.sidebar.success("API 인증 완료")
+    st.sidebar.error("❌ API 인증 정보가 없습니다.")
+    st.sidebar.info("Streamlit Cloud 설정의 Secrets 탭에 CLIENT_ID와 CLIENT_SECRET을 입력해 주세요.")
 
 keywords_input = st.sidebar.text_input("비교 키워드 (쉼표 구분)", "선풍기, 핫팩")
 target_keywords = [k.strip() for k in keywords_input.split(",") if k.strip()]
