@@ -10,7 +10,7 @@
 
 ## 사용 방법
 1. `.env.local` 파일에 네이버 API Client ID 및 Secret 설정
-2. `pip install streamlit plotly pandas requests` 설치
+2. `pip install -r requirements.txt` 명령어로 필요한 라이브러리 설치
 3. `streamlit run app.py` 실행
 
 ## 기술 스택
